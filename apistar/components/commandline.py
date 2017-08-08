@@ -3,6 +3,7 @@ import inspect
 import typing
 
 from apistar import exceptions
+from apistar.cli import Command, SubCommand
 from apistar.interfaces import CommandConfig, CommandLineClient, HandlerLookup
 
 
@@ -22,8 +23,26 @@ class ArgParseCommandLineClient(CommandLineClient):
         parser.set_defaults(handler=main)
         subparsers = parser.add_subparsers(title='Commands', metavar='[COMMAND]')
 
-        for name, handler in commands:
-            subparser = subparsers.add_parser(name, help='')
+        initialize_subparser(subparsers, commands)
+
+        self._parser = parser
+
+    def parse(self,
+              args: typing.Sequence[str]) -> HandlerLookup:
+        kwargs = vars(self._parser.parse_args(args))
+        handler = kwargs.pop('handler')
+        if handler is main:
+            kwargs['usage'] = self._parser.format_usage()
+        return handler, kwargs
+
+
+def initialize_subparser(subparsers: argparse._SubParsersAction,
+                         commands: CommandConfig) -> None:
+    for command in commands:
+        if isinstance(command, Command):
+            name, handler, help, description = command
+
+            subparser = subparsers.add_parser(name, help=help, description=description)
             subparser.set_defaults(handler=handler)
 
             parameters = inspect.signature(handler).parameters
@@ -64,12 +83,10 @@ class ArgParseCommandLineClient(CommandLineClient):
                             default=default
                         )
 
-        self._parser = parser
+        elif isinstance(command, SubCommand):
+            name, commands, help, description = command
 
-    def parse(self,
-              args: typing.Sequence[str]) -> HandlerLookup:
-        kwargs = vars(self._parser.parse_args(args))
-        handler = kwargs.pop('handler')
-        if handler is main:
-            kwargs['usage'] = self._parser.format_usage()
-        return handler, kwargs
+            subparser = subparsers.add_parser(name, help=help, description=description)
+            sub_subparsers = subparser.add_subparsers(title='Commands', metavar='[COMMAND]')
+
+            initialize_subparser(sub_subparsers, commands)

@@ -83,7 +83,7 @@ class StaticFiles(metaclass=abc.ABCMeta):
 
 # Command Line Parser
 
-CommandConfig = typing.Sequence[cli.Command]
+CommandConfig = typing.Sequence[typing.Union[cli.Command, cli.SubCommand]]
 CommandConfig.__name__ = 'CommandConfig'
 
 
